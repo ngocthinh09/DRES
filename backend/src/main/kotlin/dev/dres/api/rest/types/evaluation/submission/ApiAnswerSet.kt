@@ -36,6 +36,7 @@ data class ApiAnswerSet(
         ApiVerdictStatus.WRONG -> VerdictStatus.WRONG
         ApiVerdictStatus.INDETERMINATE -> VerdictStatus.INDETERMINATE
         ApiVerdictStatus.UNDECIDABLE -> VerdictStatus.UNDECIDABLE
+        ApiVerdictStatus.PARTIAL -> VerdictStatus.PARTIAL
     }
 
     override fun answers(): Sequence<Answer> = answers.asSequence()

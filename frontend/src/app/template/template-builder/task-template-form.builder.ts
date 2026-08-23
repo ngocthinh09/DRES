@@ -79,6 +79,9 @@ export class TaskTemplateFormBuilder {
   }
 
   public getTargetMediaItems(): ApiMediaItem[] {
+    if (this.taskType.targetOption === 'TRAKE') {
+      return [];
+    }
     return this.form.get('target')['controls'].map((it) => it.get('mediaItem').value);
   }
 
@@ -150,9 +153,14 @@ export class TaskTemplateFormBuilder {
         array.push(f);
         return f;
       case 'SINGLE_MEDIA_SEGMENT':
+      case 'TRAKE':
         const targetForm = this.singleMediaSegmentTargetForm(newIndex, initialise, store, item);
         array.push(targetForm);
         return targetForm;
+      case 'TEXT_VIDEO_SEGMENT':
+        const qaForm = this.qaTargetForm(newIndex, initialise, store, item);
+        array.push(qaForm);
+        return qaForm;
       case 'JUDGEMENT':
       case 'VOTE':
         console.warn("Judgement and Vote shouldn't have access to add targets. This is a programmer's error.");
@@ -225,7 +233,7 @@ export class TaskTemplateFormBuilder {
       targets: (this.form.get('target') as UntypedFormArray).controls.map((t) => {
         return {
           type: t.get('type').value,
-          target: t.get('mediaItem')?.value?.mediaItemId ?? null,
+          target: t.get('answer')?.value ?? t.get('mediaItem')?.value?.mediaItemId ?? null,
           range:
             t.get('segment_start') && t.get('segment_start')
               ? ({
@@ -271,7 +279,7 @@ export class TaskTemplateFormBuilder {
       return {
         type: t.get('type').value,
         /** Either its the mediaItem's ID or its text that is stored in 'mediaItem' form control */
-        target: t.get('mediaItem')?.value?.mediaItemId ?? t.get('mediaItem')?.value,
+        target: t.get('answer')?.value ?? t.get('mediaItem')?.value?.mediaItemId ?? t.get('mediaItem')?.value,
         range:
           t.get('segment_start') && t.get('segment_start')
             ? ({
@@ -354,6 +362,13 @@ export class TaskTemplateFormBuilder {
           text.push(this.singleTextTargetForm());
         }
         return new UntypedFormArray(text);
+      case 'TEXT_VIDEO_SEGMENT':
+        return new UntypedFormArray(
+          this.data?.targets?.length
+            ? this.data.targets.map((target, index) => this.qaTargetForm(index, target))
+            : [this.qaTargetForm(0)]
+        );
+      case 'TRAKE':
       case 'SINGLE_MEDIA_SEGMENT':
       case 'SINGLE_MEDIA_ITEM':
         // Handling multiple here, since it's the default.
@@ -368,7 +383,7 @@ export class TaskTemplateFormBuilder {
             }
           });
         } else {
-          content.push(this.singleMediaItemTargetForm(0));
+          content.push(targetOption === 'SINGLE_MEDIA_ITEM' ? this.singleMediaItemTargetForm(0) : this.singleMediaSegmentTargetForm(0));
         }
         return new UntypedFormArray(content);
     }
@@ -486,6 +501,14 @@ export class TaskTemplateFormBuilder {
     formGroup.get('segment_end').updateValueAndValidity();
 
     return formGroup;
+  }
+
+  /** Target editor for a Q&A answer coupled with a video range. */
+  private qaTargetForm(index: number, initialize?: ApiTarget, store: boolean = false, item?: ApiMediaItem): UntypedFormGroup {
+    const form = this.singleMediaSegmentTargetForm(index, initialize, store, item);
+    form.get('type').setValue(ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE);
+    form.addControl('answer', new UntypedFormControl(initialize?.target ?? null, [Validators.required]));
+    return form;
   }
 
   private singleTextTargetForm(initialize?: ApiTarget) {

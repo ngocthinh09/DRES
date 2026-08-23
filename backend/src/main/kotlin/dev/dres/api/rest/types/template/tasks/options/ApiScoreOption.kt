@@ -10,7 +10,7 @@ import dev.dres.data.model.template.task.options.DbScoreOption
  * @version 1.1.0
  */
 enum class ApiScoreOption {
-    KIS, AVS, LEGACY_AVS, NOOP;
+    KIS, AVS, LEGACY_AVS, NOOP, TRAKE;
 
     /**
      * Converts this [ApiScoreOption] to a [DbScoreOption] representation. Requires an ongoing transaction.
@@ -22,5 +22,6 @@ enum class ApiScoreOption {
         AVS -> DbScoreOption.AVS
         LEGACY_AVS -> DbScoreOption.LEGACY_AVS
         NOOP -> DbScoreOption.NOOP
+        TRAKE -> DbScoreOption.TRAKE
     }
 }

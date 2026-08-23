@@ -11,23 +11,23 @@ import kotlin.math.max
 class KisTaskScorer(
     scoreable: Scoreable,
     private val maxPointsPerTask: Double = defaultmaxPointsPerTask,
-    private val maxPointsAtTaskEnd: Double = defaultmaxPointsAtTaskEnd,
-    private val penaltyPerWrongSubmission: Double = defaultpenaltyPerWrongSubmission,
+    private val maxPointsAtTaskEnd: Double = maxPointsPerTask / 2.0,
+    private val penaltyPerWrongSubmission: Double = maxPointsPerTask / 10.0,
     store: TransientEntityStore?
 ) : AbstractTaskScorer(scoreable, store) {
 
     constructor(run: TaskRun, parameters: Map<String, String>, store: TransientEntityStore?) : this(
         run,
-        parameters.getOrDefault("maxPointsPerTask", "$defaultmaxPointsPerTask").toDoubleOrNull() ?: defaultmaxPointsPerTask,
-        parameters.getOrDefault("maxPointsAtTaskEnd", "$defaultmaxPointsAtTaskEnd").toDoubleOrNull() ?: defaultmaxPointsAtTaskEnd,
-        parameters.getOrDefault("penaltyPerWrongSubmission", "$defaultpenaltyPerWrongSubmission").toDoubleOrNull() ?: defaultpenaltyPerWrongSubmission,
+        parameters["maxPointsPerTask"]?.toDoubleOrNull() ?: defaultmaxPointsPerTask,
+        parameters["maxPointsAtTaskEnd"]?.toDoubleOrNull()
+            ?: (parameters["maxPointsPerTask"]?.toDoubleOrNull() ?: defaultmaxPointsPerTask) / 2.0,
+        parameters["penaltyPerWrongSubmission"]?.toDoubleOrNull()
+            ?: (parameters["maxPointsPerTask"]?.toDoubleOrNull() ?: defaultmaxPointsPerTask) / 10.0,
         store
     )
 
     companion object {
-        private const val defaultmaxPointsPerTask: Double = 1000.0
-        private const val defaultmaxPointsAtTaskEnd: Double = 500.0
-        private const val defaultpenaltyPerWrongSubmission: Double = 100.0
+        private const val defaultmaxPointsPerTask: Double = 100.0
     }
 
     /**

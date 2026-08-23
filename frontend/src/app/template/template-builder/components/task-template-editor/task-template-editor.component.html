@@ -109,6 +109,11 @@
         >
           <!-- follwing must not be flex, otherwise messes up layout heavily -->
           <div class="flex-90 flex-row content-between align-stretch" style="width: 100%">
+            <p class="flex-33" *ngIf="target.get('answer')">
+              <mat-form-field style="width: 100%">
+                <input type="text" matInput placeholder="Correct answer" [formControl]="target.get('answer')" />
+              </mat-form-field>
+            </p>
             <p [class]="target.get('mediaItem') && taskType.targetOption == 'TEXT' ? 'flex-100' : 'flex-33'">
               <mat-form-field
                 *ngIf="target.get('mediaItem') && taskType.targetOption != 'TEXT'"

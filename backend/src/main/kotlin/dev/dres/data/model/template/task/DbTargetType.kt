@@ -17,6 +17,8 @@ class DbTargetType(entity: Entity): XdEnumEntity(entity) {
         val MEDIA_ITEM by enumField { description = "MEDIA_ITEM" }
         val MEDIA_ITEM_TEMPORAL_RANGE by enumField { description = "MEDIA_ITEM_TEMPORAL_RANGE" }
         val TEXT by enumField { description = "EXTERNAL_IMAGE" }
+        /** A text answer, media item and temporal range bundled into one target. */
+        val TEXT_MEDIA_ITEM_TEMPORAL_RANGE by enumField { description = "TEXT_MEDIA_ITEM_TEMPORAL_RANGE" }
     }
 
     /** Name / description of the [DbScoreOption]. */

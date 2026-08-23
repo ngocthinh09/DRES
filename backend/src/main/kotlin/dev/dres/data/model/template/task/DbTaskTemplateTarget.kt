@@ -29,13 +29,16 @@ class DbTaskTemplateTarget(entity: Entity) : XdEntity(entity) {
     var item by xdLink0_1(DbMediaItem)
 
     /** The target text. Can be null. */
-    var text by xdStringProp() { requireIf { this.type == DbTargetType.TEXT }}
+    var text by xdStringProp() { requireIf { this.type == DbTargetType.TEXT || this.type == DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE }}
 
     /** The start of a (potential) range. */
-    var start by xdNullableLongProp { requireIf { this.type == DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE } }
+    var start by xdNullableLongProp { requireIf { this.type == DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE || this.type == DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE } }
 
     /** The start of a (potential) range. */
-    var end by xdNullableLongProp { requireIf { this.type == DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE } }
+    var end by xdNullableLongProp { requireIf { this.type == DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE || this.type == DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE } }
+
+    /** The stable order of this target in its task template. */
+    var ordinal by xdIntProp()
 
     /** Returns the [TemporalRange] of this [DbTaskTemplateTarget]. */
     val range: TemporalRange?
@@ -63,6 +66,12 @@ class DbTaskTemplateTarget(entity: Entity) : XdEntity(entity) {
             item = this.item?.toApi()
         )
         DbTargetType.TEXT -> ApiTarget(this.type.toApi(), this.text)
+        DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE -> ApiTarget(
+            type = this.type.toApi(),
+            target = this.text,
+            range = this.range?.let { ApiTemporalRange(it) },
+            item = this.item?.toApi()
+        )
         else -> throw IllegalStateException("Task description of type ${this.type.description} is not supported.")
     }
 }

@@ -47,6 +47,9 @@ class DuplicateSubmissionFilter : AbstractSubmissionFilter("Duplicate submission
      * @return True, if compared sets are equivalents and thus duplicates.
      */
     private fun isEquivalent(a: DbAnswerSet, b: ApiClientAnswerSet): Boolean {
+        if (a.answers.size() != b.answers.size) {
+            return false
+        }
         for (answer in a.answers) {
             if (b.answers.find { it.text == answer.text && it.start == answer.start && it.end == answer.end && it.mediaItemName == answer.item?.name } == null) {
                 return false

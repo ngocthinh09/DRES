@@ -10,6 +10,7 @@ import dev.dres.data.model.template.TemplateId
 import dev.dres.data.model.template.task.options.DbConfiguredOption
 import dev.dres.data.model.template.task.options.DbScoreOption
 import dev.dres.data.model.template.task.options.DbTaskOption
+import dev.dres.data.model.template.task.options.DbTargetOption
 import dev.dres.data.model.template.team.TeamId
 import dev.dres.run.filter.basics.AcceptAllSubmissionFilter
 import dev.dres.run.filter.basics.SubmissionFilter
@@ -19,6 +20,7 @@ import dev.dres.run.score.scoreboard.Scoreboard
 import dev.dres.run.score.scorer.*
 import dev.dres.run.transformer.MapToSegmentTransformer
 import dev.dres.run.transformer.SubmissionTaskMatchTransformer
+import dev.dres.run.transformer.AicTextSubmissionTransformer
 import dev.dres.run.transformer.basics.SubmissionTransformer
 import dev.dres.run.transformer.basics.CombiningSubmissionTransformer
 import jetbrains.exodus.database.TransientEntityStore
@@ -136,9 +138,9 @@ class InteractiveSynchronousEvaluation(store: TransientEntityStore, evaluation: 
                 } else {
                     CombiningSubmissionFilter(
                         task.template.taskGroup.type.submission.asSequence().map { option ->
-                            val parameters =
-                                task.template.taskGroup.type.configurations.query(DbConfiguredOption::key eq option.description)
-                                    .asSequence().map { it.key to it.value }.toMap()
+                            val parameters = task.template.taskGroup.type.configurations
+                                .query(DbConfiguredOption::key.startsWith("${option.description}."))
+                                .asSequence().associate { it.key.substringAfter(".") to it.value }
                             option.newFilter(parameters)
                         }.toList()
                     )
@@ -146,17 +148,13 @@ class InteractiveSynchronousEvaluation(store: TransientEntityStore, evaluation: 
             }
 
             this.transformer = store.transactional {
-                val mapToSegment = task.template.taskGroup.type.options.contains(DbTaskOption.MAP_TO_SEGMENT)
-                if (mapToSegment) {
-                    CombiningSubmissionTransformer(
-                        listOf(
-                            SubmissionTaskMatchTransformer(this.taskId),
-                            MapToSegmentTransformer()
-                        )
-                    )
-                } else {
-                    SubmissionTaskMatchTransformer(this.taskId)
+                val transformers = mutableListOf<SubmissionTransformer>(SubmissionTaskMatchTransformer(this.taskId))
+                when (task.template.taskGroup.type.target) {
+                    DbTargetOption.TEXT_VIDEO_SEGMENT -> transformers.add(AicTextSubmissionTransformer(this.taskId, task.template.collection.name, AicTextSubmissionTransformer.Mode.QA))
+                    DbTargetOption.TRAKE -> transformers.add(AicTextSubmissionTransformer(this.taskId, task.template.collection.name, AicTextSubmissionTransformer.Mode.TRAKE))
                 }
+                if (task.template.taskGroup.type.options.contains(DbTaskOption.MAP_TO_SEGMENT)) transformers.add(MapToSegmentTransformer())
+                CombiningSubmissionTransformer(transformers)
             }
 
             /* Initialize task scorer. */
@@ -165,7 +163,7 @@ class InteractiveSynchronousEvaluation(store: TransientEntityStore, evaluation: 
                     when (val scoreOption = task.template.taskGroup.type.score) {
                         DbScoreOption.KIS -> KisTaskScorer(
                             this,
-                            task.template.taskGroup.type.configurations.query(DbConfiguredOption::key.startsWith(scoreOption.description))
+                            task.template.taskGroup.type.configurations.query(DbConfiguredOption::key.startsWith("${scoreOption.description}."))
                                 /* the split[1] is okay, as DOMAIN.KEY is enforced in template manager (here, DOMAIN is scoreOption.description)*/
                                 .asSequence().map { it.key.substringAfter(".") to it.value }.toMap(),
                             store
@@ -174,6 +172,12 @@ class InteractiveSynchronousEvaluation(store: TransientEntityStore, evaluation: 
                         DbScoreOption.AVS -> AvsTaskScorer(this, store)
                         DbScoreOption.LEGACY_AVS -> LegacyAvsTaskScorer(this, store)
                         DbScoreOption.NOOP -> NoOpTaskScorer(this)
+                        DbScoreOption.TRAKE -> TrakeTaskScorer(
+                            this,
+                            task.template.taskGroup.type.configurations.query(DbConfiguredOption::key.startsWith("${scoreOption.description}."))
+                                .asSequence().associate { it.key.substringAfter(".") to it.value },
+                            store
+                        )
                         else -> throw IllegalStateException("The task score option $scoreOption is currently not supported.")
                     }
                 )

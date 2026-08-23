@@ -24,13 +24,15 @@ class DbVerdictStatus(entity: Entity) : XdEnumEntity(entity) {
         val INDETERMINATE by enumField { description = VerdictStatus.INDETERMINATE.name }
         /** Submission has been deemed as undecidable. The semantic of this depends on the consumer of this information */
         val UNDECIDABLE by enumField { description = VerdictStatus.UNDECIDABLE.name }
+        /** Submission is partially correct (used by TRAKE). */
+        val PARTIAL by enumField { description = VerdictStatus.PARTIAL.name }
 
         /**
          * Returns a list of all [DbRole] values.
          *
          * @return List of all [DbRole] values.
          */
-        fun values() = listOf(CORRECT, WRONG, INDETERMINATE, UNDECIDABLE)
+        fun values() = listOf(CORRECT, WRONG, INDETERMINATE, UNDECIDABLE, PARTIAL)
 
         /**
          * Parses a [DbRole] instance from a [String].
@@ -40,6 +42,7 @@ class DbVerdictStatus(entity: Entity) : XdEnumEntity(entity) {
             VerdictStatus.WRONG.name -> WRONG
             VerdictStatus.INDETERMINATE.name -> INDETERMINATE
             VerdictStatus.UNDECIDABLE.name  -> UNDECIDABLE
+            VerdictStatus.PARTIAL.name -> PARTIAL
             else -> throw IllegalArgumentException("Failed to parse submission status '$string'.")
         }
     }

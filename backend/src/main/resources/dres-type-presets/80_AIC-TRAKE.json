@@ -1,0 +1,19 @@
+{
+ "name": "HCMC AIC TRAKE",
+ "duration": 300,
+ "targetOption": "TRAKE",
+ "hintOptions": [
+  "TEXT"
+ ],
+ "submissionOptions": [
+  "NO_DUPLICATES",
+  "TEXTUAL_SUBMISSION"
+ ],
+ "taskOptions": [
+  "HIDDEN_RESULTS"
+ ],
+ "scoreOption": "TRAKE",
+ "configuration": {
+  "TRAKE.maxPointsPerTask": "1000.0"
+ }
+}

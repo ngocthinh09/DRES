@@ -44,6 +44,30 @@ abstract class AbstractInteractiveTask(store: TransientEntityStore, task: DbTask
                     template.targets.filter { it.text ne null }.asSequence().map { it.text!! }.toList()
                 )
 
+                DbTargetOption.TEXT_VIDEO_SEGMENT -> {
+                    val target = template.targets
+                        .filter { (it.type eq dev.dres.data.model.template.task.DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE) and (it.item ne null) and (it.start ne null) and (it.end ne null) and (it.text ne null) }
+                        .singleOrNull()
+                        ?: throw IllegalStateException("A TEXT_VIDEO_SEGMENT task requires exactly one composite target.")
+                    QaAnswerSetValidator(
+                        answerPattern = qaPattern(target.text!!),
+                        itemId = target.item!!.mediaItemId,
+                        start = target.start!!,
+                        end = target.end!!
+                    )
+                }
+
+                DbTargetOption.TRAKE -> {
+                    val targets = template.targets
+                        .filter { (it.type eq dev.dres.data.model.template.task.DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE) and (it.item ne null) and (it.start ne null) and (it.end ne null) }
+                        .asSequence().sortedBy { it.ordinal }.map {
+                            TrakeAnswerSetValidator.RangeTarget(it.item!!.mediaItemId, it.start!!, it.end!!)
+                        }.toList()
+                    require(targets.isNotEmpty()) { "A TRAKE task requires at least one temporal target." }
+                    require(targets.map { it.itemId }.distinct().size == 1) { "All TRAKE targets must belong to the same media item." }
+                    TrakeAnswerSetValidator(targets)
+                }
+
                 DbTargetOption.JUDGEMENT -> {
                     val knownRanges =
                         template.targets.filter { (it.item ne null) and (it.start ne null) and (it.end ne null) }
@@ -68,6 +92,13 @@ abstract class AbstractInteractiveTask(store: TransientEntityStore, task: DbTask
                 else -> throw IllegalStateException("The provided target option ${targetOption.description} is not supported by interactive tasks.")
             }
         }
+    }
+
+    /** Keeps the literal/regex answer convention of [TextAnswerSetValidator]. */
+    private fun qaPattern(target: String): Regex = when {
+        target.startsWith("\\") && target.endsWith("\\i") -> Regex(target.substring(1, target.length - 2), setOf(RegexOption.CANON_EQ, RegexOption.IGNORE_CASE))
+        target.startsWith("\\") && target.endsWith("\\") -> Regex(target.substring(1, target.length - 1), RegexOption.CANON_EQ)
+        else -> Regex(target, setOf(RegexOption.CANON_EQ, RegexOption.LITERAL))
     }
 
 }

@@ -19,6 +19,10 @@ class DbTargetOption(entity: Entity) : XdEnumEntity(entity) {
         val JUDGEMENT by enumField { description = "JUDGEMENT" }
         val VOTE by enumField { description = "VOTE" }
         val TEXT by enumField { description = "TEXT" }
+        /** A textual answer coupled with a video segment. */
+        val TEXT_VIDEO_SEGMENT by enumField { description = "TEXT_VIDEO_SEGMENT" }
+        /** Temporal Retrieval of Aligned Key Events. */
+        val TRAKE by enumField { description = "TRAKE" }
     }
 
     /** Name / description of the [DbTargetOption]. */

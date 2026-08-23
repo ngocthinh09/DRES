@@ -101,13 +101,13 @@ abstract class AbstractDresIntegrationTest {
 
             /* Warm up all XdEnumEntity caches so they can be referenced outside transactions in tests. */
             s.transactional(true) {
-                DbScoreOption.KIS; DbScoreOption.AVS; DbScoreOption.LEGACY_AVS; DbScoreOption.NOOP
+                DbScoreOption.KIS; DbScoreOption.AVS; DbScoreOption.LEGACY_AVS; DbScoreOption.NOOP; DbScoreOption.TRAKE
                 DbTargetOption.MEDIA_ITEM; DbTargetOption.MEDIA_SEGMENT
-                DbTargetOption.JUDGEMENT; DbTargetOption.VOTE; DbTargetOption.TEXT
+                DbTargetOption.JUDGEMENT; DbTargetOption.VOTE; DbTargetOption.TEXT; DbTargetOption.TEXT_VIDEO_SEGMENT; DbTargetOption.TRAKE
                 DbHintOption.IMAGE_ITEM; DbHintOption.VIDEO_ITEM_SEGMENT; DbHintOption.TEXT
                 DbHintOption.EXTERNAL_IMAGE; DbHintOption.EXTERNAL_VIDEO
                 DbTargetType.MEDIA_ITEM; DbTargetType.MEDIA_ITEM_TEMPORAL_RANGE
-                DbTargetType.JUDGEMENT; DbTargetType.JUDGEMENT_WITH_VOTE; DbTargetType.TEXT
+                DbTargetType.JUDGEMENT; DbTargetType.JUDGEMENT_WITH_VOTE; DbTargetType.TEXT; DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE
                 DbSubmissionOption.NO_DUPLICATES; DbSubmissionOption.LIMIT_CORRECT_PER_TEAM
                 DbSubmissionOption.LIMIT_WRONG_PER_TEAM; DbSubmissionOption.LIMIT_TOTAL_PER_TEAM
                 DbSubmissionOption.LIMIT_CORRECT_PER_MEMBER; DbSubmissionOption.TEMPORAL_SUBMISSION
@@ -122,7 +122,7 @@ abstract class AbstractDresIntegrationTest {
                 DbHintType.EMPTY; DbHintType.VIDEO; DbHintType.IMAGE; DbHintType.TEXT
                 DbAnswerType.TEMPORAL; DbAnswerType.ITEM; DbAnswerType.TEXT
                 DbVerdictStatus.CORRECT; DbVerdictStatus.WRONG
-                DbVerdictStatus.INDETERMINATE; DbVerdictStatus.UNDECIDABLE
+                DbVerdictStatus.INDETERMINATE; DbVerdictStatus.UNDECIDABLE; DbVerdictStatus.PARTIAL
                 DbRole.VIEWER; DbRole.PARTICIPANT; DbRole.JUDGE; DbRole.ADMIN
             }
 

@@ -10,7 +10,7 @@ import dev.dres.data.model.submissions.DbVerdictStatus
  * @version 1.0.0
  */
 enum class ApiVerdictStatus {
-    CORRECT, WRONG, INDETERMINATE, UNDECIDABLE;
+    CORRECT, WRONG, INDETERMINATE, UNDECIDABLE, PARTIAL;
 
     /**
      * Converts this [ApiVerdictStatus] to a [DbVerdictStatus] representation. Requires an ongoing transaction.
@@ -22,6 +22,7 @@ enum class ApiVerdictStatus {
         WRONG -> DbVerdictStatus.WRONG
         INDETERMINATE -> DbVerdictStatus.INDETERMINATE
         UNDECIDABLE -> DbVerdictStatus.UNDECIDABLE
+        PARTIAL -> DbVerdictStatus.PARTIAL
     }
 
 }

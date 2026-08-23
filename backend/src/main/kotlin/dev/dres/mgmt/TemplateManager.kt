@@ -214,15 +214,21 @@ object TemplateManager {
 
             /* Update task targets. */
             task.targets.clear()
-            for (target in apiTask.targets) {
+            for ((targetOrdinal, target) in apiTask.targets.withIndex()) {
                 task.targets.add(DbTaskTemplateTarget.new {
                     this.type = target.type.toDb()
+                    this.ordinal = targetOrdinal
+                    val targetItemId = when (target.type) {
+                        ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE -> target.item?.mediaItemId
+                        else -> target.target
+                    }
+                    this.item = targetItemId?.let { DbMediaItem.query(DbMediaItem::id eq it).firstOrNull() }
                     this.start = target.range?.start?.toTemporalPoint(item?.fps ?: 0.0f)?.toMilliseconds()
                     this.end = target.range?.end?.toTemporalPoint(item?.fps ?: 0.0f)?.toMilliseconds()
                     when (target.type) {
-                        ApiTargetType.TEXT -> this.text = target.target
-                        else -> this.item =
-                            target.target?.let { DbMediaItem.query(DbMediaItem::id eq it).firstOrNull() }
+                        ApiTargetType.TEXT,
+                        ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE -> this.text = target.target
+                        else -> { /* item has already been resolved above */ }
                     }
                 })
             }

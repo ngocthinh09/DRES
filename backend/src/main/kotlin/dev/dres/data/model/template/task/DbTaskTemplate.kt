@@ -87,6 +87,7 @@ class DbTaskTemplate(entity: Entity) : PersistentEntity(entity), TaskTemplate {
                     this.end = it.end
                     this.item = it.item
                     this.text = it.text
+                    this.ordinal = it.ordinal
                 }
             )
         }
@@ -131,7 +132,7 @@ class DbTaskTemplate(entity: Entity) : PersistentEntity(entity), TaskTemplate {
         this.taskGroup.type.name,
         this.duration,
         this.collection.id,
-        this.targets.asSequence().map { it.toApi() }.toList(),
+        this.targets.asSequence().sortedBy { it.ordinal }.map { it.toApi() }.toList(),
         this.hints.asSequence().map { it.toApi() }.toList(),
         this.comment
     )
