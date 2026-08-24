@@ -79,7 +79,7 @@ export class TaskTemplateFormBuilder {
   }
 
   public getTargetMediaItems(): ApiMediaItem[] {
-    if (this.taskType.targetOption === 'TRAKE') {
+    if (this.taskType.targetOption === 'TRAKE' || this.taskType.targetOption === 'TEXT_VIDEO_SEGMENT') {
       return [];
     }
     return this.form.get('target')['controls'].map((it) => it.get('mediaItem').value);
@@ -153,12 +153,15 @@ export class TaskTemplateFormBuilder {
         array.push(f);
         return f;
       case 'SINGLE_MEDIA_SEGMENT':
-      case 'TRAKE':
         const targetForm = this.singleMediaSegmentTargetForm(newIndex, initialise, store, item);
         array.push(targetForm);
         return targetForm;
+      case 'TRAKE':
+        const trakeTargetForm = this.trakeTargetForm(initialise);
+        array.push(trakeTargetForm);
+        return trakeTargetForm;
       case 'TEXT_VIDEO_SEGMENT':
-        const qaForm = this.qaTargetForm(newIndex, initialise, store, item);
+        const qaForm = this.qaTargetForm(newIndex, initialise ? [initialise] : [], store, item);
         array.push(qaForm);
         return qaForm;
       case 'JUDGEMENT':
@@ -230,19 +233,7 @@ export class TaskTemplateFormBuilder {
           path: c.get('path') ? c.get('path').value : null,
         } as ApiHint;
       }),
-      targets: (this.form.get('target') as UntypedFormArray).controls.map((t) => {
-        return {
-          type: t.get('type').value,
-          target: t.get('answer')?.value ?? t.get('mediaItem')?.value?.mediaItemId ?? null,
-          range:
-            t.get('segment_start') && t.get('segment_start')
-              ? ({
-                  start: { value: t.get('segment_start').value, unit: t.get('segment_time_unit').value } as ApiTemporalPoint,
-                  end: { value: t.get('segment_end').value, unit: t.get('segment_time_unit').value } as ApiTemporalPoint,
-                } as ApiTemporalRange)
-              : null,
-        } as ApiTarget;
-      }) as Array<ApiTarget>,
+      targets: this.serializedTargets(),
     } as ApiTaskTemplate;
 
     /* Set ID of set. */
@@ -275,23 +266,60 @@ export class TaskTemplateFormBuilder {
         path: c.get('path') ? c.get('path').value : null,
       } as ApiHint;
     });
-    this.data.targets = (this.form.get('target') as UntypedFormArray).controls.map((t) => {
-      return {
-        type: t.get('type').value,
-        /** Either its the mediaItem's ID or its text that is stored in 'mediaItem' form control */
-        target: t.get('answer')?.value ?? t.get('mediaItem')?.value?.mediaItemId ?? t.get('mediaItem')?.value,
-        range:
-          t.get('segment_start') && t.get('segment_start')
-            ? ({
-                start: { value: t.get('segment_start').value, unit: t.get('segment_time_unit').value } as ApiTemporalPoint,
-                end: { value: t.get('segment_end').value, unit: t.get('segment_time_unit').value } as ApiTemporalPoint,
-              } as ApiTemporalRange)
-            : null,
-      } as ApiTarget;
-    }) as Array<ApiTarget>;
+    this.data.targets = this.serializedTargets();
 
     /* Reset ID if set. */
     this.data.id = this.form.get('id')?.value ?? null;
+  }
+
+  /** Serializes one Q&A group per alternative while keeping the API JSON format unchanged. */
+  private serializedTargets(): Array<ApiTarget> {
+    const targets = (this.form.get('target') as UntypedFormArray).controls;
+    if (this.taskType.targetOption === 'TEXT_VIDEO_SEGMENT') {
+      return targets.flatMap((target) => {
+        const mediaItem = target.get('mediaItem')?.value;
+        const range = this.targetRange(target);
+        return (target.get('answers') as UntypedFormArray).controls.map(
+          (answer) =>
+            ({
+              type: ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE,
+              target: answer.value,
+              item: mediaItem && typeof mediaItem !== 'string' ? mediaItem : null,
+              range,
+            }) as ApiTarget
+        );
+      });
+    }
+    return targets.map((target) => {
+      const mediaItem = this.taskType.targetOption === 'TRAKE' ? this.form.get('trakeMediaItem')?.value : target.get('mediaItem')?.value;
+      return {
+        type: target.get('type').value,
+        target: target.get('answer')?.value ?? mediaItem?.mediaItemId ?? mediaItem ?? null,
+        item: mediaItem && typeof mediaItem !== 'string' ? mediaItem : null,
+        range: this.targetRange(target),
+      } as ApiTarget;
+    });
+  }
+
+  private targetRange(target: AbstractControl): ApiTemporalRange | null {
+    return target.get('segment_start') && target.get('segment_end')
+      ? ({
+          start: { value: target.get('segment_start').value, unit: target.get('segment_time_unit').value } as ApiTemporalPoint,
+          end: { value: target.get('segment_end').value, unit: target.get('segment_time_unit').value } as ApiTemporalPoint,
+        } as ApiTemporalRange)
+      : null;
+  }
+
+  public addQaAlternativeAnswer(targetIndex: number) {
+    const target = (this.form.get('target') as UntypedFormArray).at(targetIndex);
+    (target.get('answers') as UntypedFormArray).push(new UntypedFormControl(null, [Validators.required]));
+  }
+
+  public removeQaAlternativeAnswer(targetIndex: number, answerIndex: number) {
+    const answers = ((this.form.get('target') as UntypedFormArray).at(targetIndex).get('answers') as UntypedFormArray);
+    if (answerIndex > 0 && answers.length > 1) {
+      answers.removeAt(answerIndex);
+    }
   }
 
   private orValidator(validator1: ValidatorFn, validator2: ValidatorFn): ValidatorFn {
@@ -338,6 +366,9 @@ export class TaskTemplateFormBuilder {
         Validators.required,
       ]),
     });
+    if (this.taskType.targetOption === 'TRAKE') {
+      this.form.addControl('trakeMediaItem', this.trakeMediaItemFormControl());
+    }
     this.form.addControl('target', this.formForTarget());
     this.form.addControl('components', this.formForQueryComponents());
   }
@@ -365,10 +396,13 @@ export class TaskTemplateFormBuilder {
       case 'TEXT_VIDEO_SEGMENT':
         return new UntypedFormArray(
           this.data?.targets?.length
-            ? this.data.targets.map((target, index) => this.qaTargetForm(index, target))
+            ? this.qaTargetGroups().map((targets, index) => this.qaTargetForm(index, targets))
             : [this.qaTargetForm(0)]
         );
       case 'TRAKE':
+        return new UntypedFormArray(
+          this.data?.targets?.length ? this.data.targets.map((target) => this.trakeTargetForm(target)) : [this.trakeTargetForm()]
+        );
       case 'SINGLE_MEDIA_SEGMENT':
       case 'SINGLE_MEDIA_ITEM':
         // Handling multiple here, since it's the default.
@@ -418,8 +452,8 @@ export class TaskTemplateFormBuilder {
     let resolveRequired = true;
 
     /* Set passed media item */
-    if (initialize?.target && item) {
-      mediaItemFormControl.setValue(item, { emitEvent: false });
+    if (initialize?.target && (item ?? initialize.item)) {
+      mediaItemFormControl.setValue(item ?? initialize.item, { emitEvent: false });
       resolveRequired = false;
     }
 
@@ -460,8 +494,8 @@ export class TaskTemplateFormBuilder {
     let resolveRequired = true;
 
     /* Set passed media item */
-    if (initialize?.target && item) {
-      mediaItemFormControl.setValue(item, { emitEvent: false });
+    if (initialize?.target && (item ?? initialize.item)) {
+      mediaItemFormControl.setValue(item ?? initialize.item, { emitEvent: false });
       resolveRequired = false;
     }
 
@@ -503,12 +537,85 @@ export class TaskTemplateFormBuilder {
     return formGroup;
   }
 
-  /** Target editor for a Q&A answer coupled with a video range. */
-  private qaTargetForm(index: number, initialize?: ApiTarget, store: boolean = false, item?: ApiMediaItem): UntypedFormGroup {
-    const form = this.singleMediaSegmentTargetForm(index, initialize, store, item);
+  /** Shared video selector for TRAKE. Every serialized target receives this media item. */
+  private trakeMediaItemFormControl(): UntypedFormControl {
+    const mediaItemFormControl = new UntypedFormControl(null, [Validators.required, RequireMatch]);
+    this.dataSources.set(
+      'trake.mediaItem',
+      mediaItemFormControl.valueChanges.pipe(
+        filter((s) => s.length >= 1),
+        switchMap((s) =>
+          this.collectionService.getApiV2CollectionByCollectionIdByStartsWith(this.form.get('mediaCollection').value, s)
+        ),
+        map((items) => items.filter((item) => item.type === 'VIDEO'))
+      )
+    );
+
+    const target = this.data?.targets?.[0];
+    const mediaItemId = target?.item?.mediaItemId ?? target?.target;
+    if (mediaItemId) {
+      this.collectionService
+        .getApiV2MediaItemByMediaItemId(mediaItemId)
+        .pipe(first())
+        .subscribe((mediaItem) => mediaItemFormControl.setValue(mediaItem, { emitEvent: false }));
+    }
+    return mediaItemFormControl;
+  }
+
+  /** A TRAKE target only owns its manually authored temporal range; the video is shared by the task. */
+  private trakeTargetForm(initialize?: ApiTarget): UntypedFormGroup {
+    const formGroup = new UntypedFormGroup({
+      type: new UntypedFormControl(ApiTargetType.MEDIA_ITEM_TEMPORAL_RANGE),
+      segment_start: new UntypedFormControl(initialize?.range.start.value, [Validators.required]),
+      segment_end: new UntypedFormControl(initialize?.range.end.value, [Validators.required]),
+      segment_time_unit: new UntypedFormControl(initialize?.range.start.unit ?? 'SECONDS', [Validators.required]),
+    });
+    formGroup
+      .get('segment_start')
+      .setValidators([
+        Validators.required,
+        this.temporalPointValidator(formGroup.get('segment_time_unit') as UntypedFormControl),
+      ]);
+    formGroup
+      .get('segment_end')
+      .setValidators([
+        Validators.required,
+        this.temporalPointValidator(formGroup.get('segment_time_unit') as UntypedFormControl),
+      ]);
+    formGroup.get('segment_start').updateValueAndValidity();
+    formGroup.get('segment_end').updateValueAndValidity();
+    return formGroup;
+  }
+
+  /** Target editor for a Q&A video/range coupled with one or more answer texts. */
+  private qaTargetForm(index: number, initialize: ApiTarget[] = [], store: boolean = false, item?: ApiMediaItem): UntypedFormGroup {
+    const form = this.singleMediaSegmentTargetForm(index, initialize[0], store, item);
     form.get('type').setValue(ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE);
-    form.addControl('answer', new UntypedFormControl(initialize?.target ?? null, [Validators.required]));
+    form.addControl(
+      'answers',
+      new UntypedFormArray(
+        (initialize.length ? initialize : [null]).map((target) => new UntypedFormControl(target?.target ?? null, [Validators.required]))
+      )
+    );
     return form;
+  }
+
+  /** Groups imported Q&A entries into query targets that share the same video and range. */
+  private qaTargetGroups(): ApiTarget[][] {
+    const groups = new Map<string, ApiTarget[]>();
+    (this.data?.targets ?? []).forEach((target) => {
+      const key = [
+        target.item?.mediaItemId ?? 'missing-item',
+        target.range?.start.value ?? 'missing-start',
+        target.range?.start.unit ?? 'missing-start-unit',
+        target.range?.end.value ?? 'missing-end',
+        target.range?.end.unit ?? 'missing-end-unit',
+      ].join('|');
+      const group = groups.get(key) ?? [];
+      group.push(target);
+      groups.set(key, group);
+    });
+    return Array.from(groups.values());
   }
 
   private singleTextTargetForm(initialize?: ApiTarget) {

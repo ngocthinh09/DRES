@@ -22,15 +22,33 @@ class AicTextSubmissionTransformerTest {
         assertEquals(1234L, answer.end)
     }
 
-    @Test fun `parses TRAKE timestamps as temporal points`() {
-        val transformed = AicTextSubmissionTransformer("task", "collection", AicTextSubmissionTransformer.Mode.TRAKE)
-            .transform(submission("TR-L22_V004-1200,5600,10200"))
-        assertEquals(listOf(1200L, 5600L, 10200L), transformed.answerSets.single().answers.map { it.start })
+    @Test fun `converts zero based TRAKE frame IDs to millisecond temporal points`() {
+        val transformed = AicTextSubmissionTransformer(
+            "task", "collection", AicTextSubmissionTransformer.Mode.TRAKE,
+            mapOf("L22_V004" to AicTextSubmissionTransformer.VideoTiming(30f, 1_304_266L))
+        ).transform(submission("TR-L22_V004-0,30,45"))
+        assertEquals(listOf(0L, 1000L, 1500L), transformed.answerSets.single().answers.map { it.start })
         assertEquals(listOf("L22_V004", "L22_V004", "L22_V004"), transformed.answerSets.single().answers.map { it.mediaItemName })
     }
 
     @Test fun `rejects malformed AIC answer`() {
         val transformer = AicTextSubmissionTransformer("task", "collection", AicTextSubmissionTransformer.Mode.TRAKE)
         assertThrows(SubmissionRejectedException::class.java) { transformer.transform(submission("TR-video-12")) }
+    }
+
+    @Test fun `rejects TRAKE video without valid timing metadata`() {
+        val transformer = AicTextSubmissionTransformer(
+            "task", "collection", AicTextSubmissionTransformer.Mode.TRAKE,
+            mapOf("L22_V004" to AicTextSubmissionTransformer.VideoTiming(null, 1_000L))
+        )
+        assertThrows(SubmissionRejectedException::class.java) { transformer.transform(submission("TR-L22_V004-30")) }
+    }
+
+    @Test fun `rejects TRAKE frame outside video duration`() {
+        val transformer = AicTextSubmissionTransformer(
+            "task", "collection", AicTextSubmissionTransformer.Mode.TRAKE,
+            mapOf("L22_V004" to AicTextSubmissionTransformer.VideoTiming(30f, 1_000L))
+        )
+        assertThrows(SubmissionRejectedException::class.java) { transformer.transform(submission("TR-L22_V004-31")) }
     }
 }

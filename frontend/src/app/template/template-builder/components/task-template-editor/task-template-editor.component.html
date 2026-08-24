@@ -102,7 +102,204 @@
           <mat-icon>library_add</mat-icon>
         </button>
       </h2>
-      <div *ngIf="viewLayout === 'list'">
+      <div *ngIf="taskType.targetOption === 'TRAKE'" class="flex flex-row content-between align-stretch">
+        <p class="flex-90">
+          <mat-form-field style="width: 100%">
+            <input
+              type="text"
+              matInput
+              placeholder="TRAKE video"
+              [formControl]="form.get('trakeMediaItem')"
+              [matAutocomplete]="trakeMediaItemAuto"
+            />
+            <mat-autocomplete autoActiveFirstOption #trakeMediaItemAuto="matAutocomplete" [displayWith]="mediaItemToDisplay">
+              <mat-option
+                *ngFor="let mediaItem of this.formBuilder.dataSource('trake.mediaItem') | async | orderBy: 'asc':sortMediaItemByName"
+                [value]="mediaItem"
+              >
+                <span>{{ mediaItem.name }}</span> |
+                <small>Type: {{ mediaItem.type }}</small>
+              </mat-option>
+            </mat-autocomplete>
+            <button
+              mat-icon-button
+              matSuffix
+              aria-label="Pick random TRAKE video"
+              matTooltip="Random video from collection"
+              (click)="pickRandomMediaItem(form.get('mediaCollection').value, form.get('trakeMediaItem'))"
+            >
+              <mat-icon>shuffle</mat-icon>
+            </button>
+            <mat-error *ngIf="form.get('trakeMediaItem').hasError('incorrect')">
+              Please select a valid video from the autocomplete.
+            </mat-error>
+          </mat-form-field>
+        </p>
+      </div>
+      <div *ngIf="viewLayout === 'list' && taskType.targetOption === 'TEXT_VIDEO_SEGMENT'">
+        <div
+          *ngFor="let target of form.get('target')['controls']; let i = index"
+          class="flex flex-row content-between align-stretch"
+        >
+          <div class="flex-90 flex-row content-between align-stretch" style="width: 100%">
+            <p class="flex-100">
+              <mat-form-field style="width: 100%">
+                <input
+                  type="text"
+                  matInput
+                  placeholder="Media item"
+                  [formControl]="target.get('mediaItem')"
+                  [matAutocomplete]="qaMediaItemAuto"
+                />
+                <mat-autocomplete autoActiveFirstOption #qaMediaItemAuto="matAutocomplete" [displayWith]="mediaItemToDisplay">
+                  <mat-option
+                    *ngFor="
+                      let mediaItem of this.formBuilder.dataSource('target.' + i + '.mediaItem')
+                        | async
+                        | filterNotIn: formBuilder.getTargetMediaItems():'name'
+                        | orderBy: 'asc':sortMediaItemByName
+                    "
+                    [value]="mediaItem"
+                  >
+                    <span>{{ mediaItem.name }}</span> |
+                    <small>Type: {{ mediaItem.type }}</small>
+                  </mat-option>
+                </mat-autocomplete>
+                <button
+                  mat-icon-button
+                  matSuffix
+                  aria-label="Pick random media item"
+                  matTooltip="Random media item from collection"
+                  (click)="pickRandomMediaItem(form.get('mediaCollection').value, target.get('mediaItem'))"
+                >
+                  <mat-icon>shuffle</mat-icon>
+                </button>
+                <mat-error *ngIf="target.controls['mediaItem'].hasError('incorrect')">
+                  Please select a valid media item i.e. use the autocomplete to select a value.
+                </mat-error>
+              </mat-form-field>
+            </p>
+
+            <div class="flex-100" formArrayName="target">
+              <div [formGroupName]="i">
+                <div formArrayName="answers">
+                  <p
+                    class="flex flex-row content-between align-stretch"
+                    *ngFor="let answer of target.get('answers')['controls']; let answerIndex = index"
+                  >
+                    <mat-form-field class="flex-90">
+                      <input
+                        type="text"
+                        matInput
+                        [placeholder]="answerIndex === 0 ? 'Correct answer' : 'Alternative answer'"
+                        [formControlName]="answerIndex"
+                      />
+                    </mat-form-field>
+                    <button
+                      *ngIf="answerIndex > 0"
+                      class="flex-none"
+                      mat-icon-button
+                      aria-label="Remove alternative answer"
+                      matTooltip="Remove alternative answer"
+                      (click)="formBuilder.removeQaAlternativeAnswer(i, answerIndex)"
+                    >
+                      <mat-icon>remove</mat-icon>
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p class="flex-100">
+              <button mat-button aria-label="Add alternative answer" matTooltip="Add alternative answer" (click)="formBuilder.addQaAlternativeAnswer(i)">
+                <mat-icon>add</mat-icon>
+                Add alternative text
+              </button>
+            </p>
+
+            <p class="flex-100" *ngIf="target.get('segment_start') && target.get('segment_end')" style="max-width: 100%">
+              <span class="flex-inline flex-row content-between align-stretch">
+                <mat-form-field class="flex-30">
+                  <input
+                    #qaTargetStart
+                    [type]="target.get('segment_time_unit') === 'TIMECODE' ? 'text' : 'number'"
+                    matInput
+                    placeholder="Segment start"
+                    [formControl]="target.get('segment_start')"
+                  />
+                </mat-form-field>
+                <mat-form-field class="flex-30">
+                  <input
+                    #qaTargetEnd
+                    [type]="target.get('segment_time_unit') === 'TIMECODE' ? 'text' : 'number'"
+                    matInput
+                    placeholder="Segment end"
+                    [formControl]="target.get('segment_end')"
+                  />
+                </mat-form-field>
+                <mat-form-field class="flex-30">
+                  <mat-select
+                    [formControl]="target.get('segment_time_unit')"
+                    (selectionChange)="timeUnitChanged($event, qaTargetStart, qaTargetEnd)"
+                  >
+                    <mat-option *ngFor="let unit of units" [value]="unit">{{ unit }}</mat-option>
+                  </mat-select>
+                  <span matSuffix>
+                    <button
+                      mat-icon-button
+                      aria-label="Randomise segment start and end"
+                      matTooltip="Randomise segment start and end"
+                      [disabled]="!target.get('mediaItem').value"
+                      (click)="
+                        pickRandomSegment(
+                          target.get('mediaItem').value,
+                          target.get('segment_start'),
+                          target.get('segment_end'),
+                          target.get('segment_time_unit')
+                        )
+                      "
+                    >
+                      <mat-icon>shuffle</mat-icon>
+                    </button>
+                  </span>
+                </mat-form-field>
+                <span class="spacer-flex"></span>
+                <button
+                  mat-icon-button
+                  aria-label="Show media item"
+                  matTooltip="Show media item"
+                  [disabled]="!target.get('mediaItem').value"
+                  (click)="
+                    toggleVideoPlayer(
+                      i,
+                      target.get('mediaItem').value,
+                      target.get('segment_start'),
+                      target.get('segment_end'),
+                      target.get('segment_time_unit')
+                    )
+                  "
+                >
+                  <mat-icon>remove_red_eye</mat-icon>
+                </button>
+              </span>
+            </p>
+            <div *ngIf="activeVideoTargetIndex === i">
+              <app-video-player-segment-builder
+                [data]="this.videoSegmentData"
+                (rangeChange)="
+                  onRangeChange($event, target.get('segment_start'), target.get('segment_end'), target.get('segment_time_unit'))
+                "
+              ></app-video-player-segment-builder>
+            </div>
+          </div>
+          <div class="spacer-flex"></div>
+          <div class="flex-none">
+            <button mat-icon-button (click)="removeQueryTarget(i)" aria-label="Remove query target" matTooltip="Remove query target">
+              <mat-icon>remove</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="viewLayout === 'list' && taskType.targetOption !== 'TEXT_VIDEO_SEGMENT'">
         <div
           *ngFor="let target of form.get('target')['controls']; let i = index"
           class="flex flex-row content-between align-stretch"
@@ -114,7 +311,7 @@
                 <input type="text" matInput placeholder="Correct answer" [formControl]="target.get('answer')" />
               </mat-form-field>
             </p>
-            <p [class]="target.get('mediaItem') && taskType.targetOption == 'TEXT' ? 'flex-100' : 'flex-33'">
+            <p *ngIf="target.get('mediaItem')" [class]="taskType.targetOption == 'TEXT' ? 'flex-100' : 'flex-33'">
               <mat-form-field
                 *ngIf="target.get('mediaItem') && taskType.targetOption != 'TEXT'"
                 [style]="isImageMediaItem(target.get('mediaItem').value) ? 'width: 90%;' : 'width: 100%;'"
@@ -174,7 +371,11 @@
               </button>
             </p>
 
-            <p class="flex-66" *ngIf="target.get('segment_start') && target.get('segment_end')" style="max-width: 100%">
+            <p
+              [class]="taskType.targetOption === 'TRAKE' ? 'flex-100' : 'flex-66'"
+              *ngIf="target.get('segment_start') && target.get('segment_end')"
+              style="max-width: 100%"
+            >
               <span class="flex-inline flex-row content-between align-stretch">
                 <mat-form-field class="flex-30">
                   <input
@@ -206,10 +407,10 @@
                       mat-icon-button
                       aria-label="Randomise segment start and end."
                       matTooltip="Randomise segment start and end."
-                      [disabled]="!target.get('mediaItem').value"
+                      [disabled]="!(target.get('mediaItem')?.value || form.get('trakeMediaItem')?.value)"
                       (click)="
                         pickRandomSegment(
-                          target.get('mediaItem').value,
+                          target.get('mediaItem')?.value || form.get('trakeMediaItem')?.value,
                           target.get('segment_start'),
                           target.get('segment_end'),
                           target.get('segment_time_unit')
@@ -225,9 +426,11 @@
                   mat-icon-button
                   aria-label="Show media item."
                   matTooltip="Show media item."
+                  [disabled]="!(target.get('mediaItem')?.value || form.get('trakeMediaItem')?.value)"
                   (click)="
                     toggleVideoPlayer(
-                      target.get('mediaItem').value,
+                      i,
+                      target.get('mediaItem')?.value || form.get('trakeMediaItem')?.value,
                       target.get('segment_start'),
                       target.get('segment_end'),
                       target.get('segment_time_unit')
@@ -245,7 +448,7 @@
                 [alt]="'Preview of ' + target.get('mediaItem').value?.name"
               />
             </p>
-            <div *ngIf="showVideo">
+            <div *ngIf="activeVideoTargetIndex === i">
               <app-video-player-segment-builder
                 [data]="this.videoSegmentData"
                 (rangeChange)="

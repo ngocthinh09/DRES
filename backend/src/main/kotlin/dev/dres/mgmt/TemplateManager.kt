@@ -223,6 +223,9 @@ object TemplateManager {
                         else -> target.target
                     }
                     this.item = targetItemId?.let { DbMediaItem.query(DbMediaItem::id eq it).firstOrNull() }
+                    if (target.type == ApiTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE && this.item == null) {
+                        throw IllegalArgumentException("A TEXT_MEDIA_ITEM_TEMPORAL_RANGE target requires a valid media item.")
+                    }
                     this.start = target.range?.start?.toTemporalPoint(item?.fps ?: 0.0f)?.toMilliseconds()
                     this.end = target.range?.end?.toTemporalPoint(item?.fps ?: 0.0f)?.toMilliseconds()
                     when (target.type) {

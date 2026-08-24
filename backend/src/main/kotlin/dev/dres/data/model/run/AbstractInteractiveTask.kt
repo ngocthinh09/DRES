@@ -45,15 +45,22 @@ abstract class AbstractInteractiveTask(store: TransientEntityStore, task: DbTask
                 )
 
                 DbTargetOption.TEXT_VIDEO_SEGMENT -> {
-                    val target = template.targets
-                        .filter { (it.type eq dev.dres.data.model.template.task.DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE) and (it.item ne null) and (it.start ne null) and (it.end ne null) and (it.text ne null) }
-                        .singleOrNull()
-                        ?: throw IllegalStateException("A TEXT_VIDEO_SEGMENT task requires exactly one composite target.")
+                    val targets = template.targets
+                        .filter { it.type eq dev.dres.data.model.template.task.DbTargetType.TEXT_MEDIA_ITEM_TEMPORAL_RANGE }
+                        .asSequence().toList()
+                    require(targets.isNotEmpty()) { "A TEXT_VIDEO_SEGMENT task requires at least one composite target." }
+                    require(targets.all { it.item != null && it.start != null && it.end != null && it.text != null }) {
+                        "Every TEXT_VIDEO_SEGMENT target requires text, a media item and a temporal range."
+                    }
                     QaAnswerSetValidator(
-                        answerPattern = qaPattern(target.text!!),
-                        itemId = target.item!!.mediaItemId,
-                        start = target.start!!,
-                        end = target.end!!
+                        targets.groupBy { Triple(it.item!!.mediaItemId, it.start!!, it.end!!) }.map { (key, alternatives) ->
+                            QaAnswerSetValidator.Target(
+                                answerPatterns = alternatives.map { qaPattern(it.text!!) }.distinct(),
+                                itemId = key.first,
+                                start = key.second,
+                                end = key.third
+                            )
+                        }
                     )
                 }
 

@@ -18,7 +18,7 @@ import {
   CollectionService,
   MediaService,
 } from '../../../../../../openapi';
-import { UntypedFormControl, UntypedFormGroup } from '@angular/forms';
+import { AbstractControl, UntypedFormControl, UntypedFormGroup } from '@angular/forms';
 import { TaskTemplateFormBuilder } from '../../task-template-form.builder';
 import { VideoPlayerSegmentBuilderData } from '../../../../competition/competition-builder/competition-builder-task-dialog/video-player-segment-builder/video-player-segment-builder.component';
 import { AppConfig } from '../../../../app.config';
@@ -55,7 +55,7 @@ export class TaskTemplateEditorComponent implements OnInit, OnDestroy {
 
   viewLayout = 'list';
 
-  showVideo = false;
+  activeVideoTargetIndex: number | null = null;
   videoSegmentData: VideoPlayerSegmentBuilderData;
 
   externalImagePreviewActive = false;
@@ -118,7 +118,7 @@ export class TaskTemplateEditorComponent implements OnInit, OnDestroy {
     this.mediaCollectionSource = this.collectionService.getApiV2CollectionList();
     this.taskGroupOptions = this.builderService.findGroupsByType(this.taskType);
     /* Close open video preview */
-    this.showVideo = false;
+    this.activeVideoTargetIndex = null;
   }
 
   public isFormValid() {
@@ -246,7 +246,7 @@ export class TaskTemplateEditorComponent implements OnInit, OnDestroy {
    * @param collectionId The ID of the collection to pick a {@link MediaItem} from.
    * @param target The target {@link FormControl} to apply the value to.
    */
-  public pickRandomMediaItem(collectionId: string, target: UntypedFormControl) {
+  public pickRandomMediaItem(collectionId: string, target: AbstractControl) {
     this.collectionService
       .getApiV2CollectionByCollectionIdRandom(collectionId)
       .pipe(first())
@@ -337,6 +337,7 @@ export class TaskTemplateEditorComponent implements OnInit, OnDestroy {
   }
 
   toggleVideoPlayer(
+    targetIndex: number,
     mediaItem: ApiMediaItem,
     startControl?: UntypedFormControl,
     endControl?: UntypedFormControl,
@@ -381,8 +382,12 @@ export class TaskTemplateEditorComponent implements OnInit, OnDestroy {
                 endControl.setValue(r.end.value);
                 unitControl.setValue(TemporalPoint.UnitEnum.SECONDS);
             });*/
+    if (this.activeVideoTargetIndex === targetIndex) {
+      this.activeVideoTargetIndex = null;
+      return;
+    }
     this.videoSegmentData = { mediaItem, segmentStart: start, segmentEnd: end } as VideoPlayerSegmentBuilderData;
-    this.showVideo = !this.showVideo;
+    this.activeVideoTargetIndex = targetIndex;
   }
 
   onRangeChange(

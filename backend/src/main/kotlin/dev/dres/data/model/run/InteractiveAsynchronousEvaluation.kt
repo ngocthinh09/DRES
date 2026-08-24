@@ -1,6 +1,7 @@
 package dev.dres.data.model.run
 
 import dev.dres.api.rest.types.template.tasks.ApiTaskTemplate
+import dev.dres.data.model.media.DbMediaType
 import dev.dres.data.model.template.DbEvaluationTemplate
 import dev.dres.data.model.template.task.DbTaskTemplate
 import dev.dres.data.model.template.team.TeamId
@@ -197,7 +198,14 @@ class InteractiveAsynchronousEvaluation(store: TransientEntityStore, evaluation:
                 val transformers = mutableListOf<SubmissionTransformer>(SubmissionTaskMatchTransformer(this.taskId))
                 when (task.template.taskGroup.type.target) {
                     DbTargetOption.TEXT_VIDEO_SEGMENT -> transformers.add(AicTextSubmissionTransformer(this.taskId, task.template.collection.name, AicTextSubmissionTransformer.Mode.QA))
-                    DbTargetOption.TRAKE -> transformers.add(AicTextSubmissionTransformer(this.taskId, task.template.collection.name, AicTextSubmissionTransformer.Mode.TRAKE))
+                    DbTargetOption.TRAKE -> transformers.add(AicTextSubmissionTransformer(
+                        this.taskId,
+                        task.template.collection.name,
+                        AicTextSubmissionTransformer.Mode.TRAKE,
+                        task.template.collection.items.asSequence().filter { it.type == DbMediaType.VIDEO }.associate {
+                            it.name to AicTextSubmissionTransformer.VideoTiming(it.fps, it.durationMs)
+                        }
+                    ))
                 }
                 if (task.template.taskGroup.type.options.asSequence().any { it == DbTaskOption.MAP_TO_SEGMENT }) transformers.add(MapToSegmentTransformer())
                 CombiningSubmissionTransformer(transformers)

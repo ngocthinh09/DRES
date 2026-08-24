@@ -4,7 +4,7 @@ Tài liệu này ghi lại phần mở rộng DRES để phục vụ các task H
 
 ## Phạm vi và quy ước thời gian
 
-- Mọi mốc/range trong đáp án và target của Q&A, TRAKE đều dùng **mili giây**.
+- Target Q&A/TRAKE và temporal answer nội bộ của DRES dùng **mili giây**. Riêng chuỗi submission TRAKE nhận Frame ID và được đổi sang ms trước khi validate.
 - `duration` của template DRES vẫn là **giây**. Khi import/export JSON, giá trị `duration` được giữ nguyên; hệ thống không tự đổi `300000` thành `300`.
 - `VIDEO_ID` phải là tên media item ở DRES và có dạng `XXX_XXXX` (không có dấu `-`). Collection được suy ra từ target/template, không phải từ chuỗi nộp bài.
 - Việc map ID media/collection khi chuyển JSON giữa các DRES server là trách nhiệm của quy trình import bên ngoài. Sau khi các ID đã được map, các trường nghiệp vụ còn lại tương thích với JSON template DRES.
@@ -17,6 +17,10 @@ Tài liệu này ghi lại phần mở rộng DRES để phục vụ các task H
 | TRAKE | `TRAKE` | `MEDIA_ITEM_TEMPORAL_RANGE` | `TRAKE` |
 
 `TEXT_MEDIA_ITEM_TEMPORAL_RANGE` là composite target: đáp án văn bản, video và range được lưu trong cùng một target. TRAKE dùng một danh sách các `MEDIA_ITEM_TEMPORAL_RANGE`; thứ tự trong danh sách là thứ tự các key event cần trả lời.
+
+Với Q&A, bài nộp được chấm đúng nếu text khớp **một** đáp án (chính hoặc thay thế)
+và video/timestamp khớp range của **cùng query target**. Các query target khác nhau
+là các phương án đúng độc lập; một bài chỉ cần khớp một trong số đó.
 
 Hai enum target option, target type, score option và verdict `PARTIAL` đều đã có ở database model, REST API và OpenAPI (`doc/oas.json`, `doc/oas-client.json`). Template export sắp target TRAKE theo thứ tự đã tạo (`ordinal`) để giữ đúng mapping vị trí đáp án.
 
@@ -44,18 +48,19 @@ QA-red-and-blue-001_0002-15320
 ### TRAKE
 
 ```text
-TR-<VIDEO_ID>-<TIME_MS_1>,<TIME_MS_2>,...
+TR-<VIDEO_ID>-<FRAME_ID_1>,<FRAME_ID_2>,...
 ```
 
 Ví dụ:
 
 ```text
-TR-001_0002-1450,6120,19875
+TR-001_0002-43,183,596
 ```
 
-- Số timestamp phải đúng bằng số target range trong template.
-- Timestamp thứ `i` được so với target range thứ `i`; cả thứ tự và video đều bắt buộc khớp.
-- Mỗi timestamp phải nằm trong range đóng `[start, end]` do người tạo đề tự chọn. Không có chuyển đổi frame ID và không có tolerance được suy ra tự động từ frame.
+- Số Frame ID phải đúng bằng số target range trong template.
+- Frame ID thứ `i` được đổi theo `floor(frameId × 1000 / fps)`, với frame bắt đầu từ `0`, rồi so với target range thứ `i`; cả thứ tự và video đều bắt buộc khớp.
+- Mỗi thời điểm sau quy đổi phải nằm trong range đóng `[start, end]` do người tạo đề tự chọn. Không có tolerance được suy ra tự động từ frame.
+- Video phải tồn tại trong collection và có `fps`/`durationMs` hợp lệ; nếu không, submission bị từ chối với lỗi rõ ràng.
 - Đúng toàn bộ là `CORRECT`; đúng ít nhất một nửa số mốc là `PARTIAL`; các trường hợp còn lại là `WRONG`.
 
 Các chuỗi không đúng format bị từ chối ở tầng submission, thay vì được đánh dấu sai một cách mơ hồ.
@@ -69,8 +74,13 @@ Hai preset mới có sẵn tại:
 
 Frontend template builder hỗ trợ:
 
-- Q&A: target video range như media segment và trường **Correct answer**.
-- TRAKE: tạo nhiều target range, cho phép các range dùng cùng một video và giữ thứ tự tạo. Người tạo đề điền trực tiếp range mong muốn.
+- Q&A: một task có thể có nhiều **query target**. Mỗi query target gồm một video,
+  một range và một **Correct answer** chính; có thể thêm nhiều **Alternative answer**
+  cho chính video/range đó. Khi export, mỗi alternative được ghi thành một
+  `TEXT_MEDIA_ITEM_TEMPORAL_RANGE` riêng nhưng giữ cùng `item` và `range`, nên JSON
+  vẫn là JSON template DRES chuẩn và có thể import lại từ server khác. Khi mở lại,
+  frontend tự gom các target có cùng video/range thành một query target.
+- TRAKE: chọn một video dùng chung ở cấp task, sau đó tạo nhiều target range theo thứ tự. Khi lưu/export, video chung được ghi vào từng target để giữ JSON DRES tương thích.
 
 Ví dụ Q&A tối thiểu:
 
@@ -163,13 +173,15 @@ Tệp backend chính:
 
 ## Kiểm thử đã thêm
 
-- `AicTextSubmissionTransformerTest`: Q&A có answer chứa dấu `-`, TRAKE nhiều timestamp, và format sai.
+- `AicTextSubmissionTransformerTest`: Q&A có answer chứa dấu `-`, TRAKE đổi Frame ID sang ms, metadata video không hợp lệ, và format sai.
+- `QaAnswerSetValidatorTest`: alternative text, nhiều query target độc lập, và ràng buộc video/range cùng nhóm.
 - `TrakeTaskScorerTest`: điểm partial, full answer ưu tiên hơn partial, và penalty cho lời giải sai.
 
 Đã chạy thành công:
 
 ```bash
 ./gradlew :backend:test \
+  --tests 'dres.run.validation.QaAnswerSetValidatorTest' \
   --tests 'dres.run.transformer.AicTextSubmissionTransformerTest' \
   --tests 'dres.run.score.scorer.TrakeTaskScorerTest'
 ```
