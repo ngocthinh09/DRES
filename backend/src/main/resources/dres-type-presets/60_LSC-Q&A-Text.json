@@ -1,7 +1,7 @@
 {
  "name": "LSC Question & Answer Text",
  "duration": 300,
- "targetOption": "JUDGEMENT",
+ "targetOption": "TEXT_VIDEO_SEGMENT",
  "hintOptions": [
   "TEXT"
  ],
@@ -15,6 +15,7 @@
  ],
  "scoreOption": "KIS",
  "configuration": {
-  "LIMIT_CORRECT_PER_TEAM.limit": "1"
+  "LIMIT_CORRECT_PER_TEAM.limit": "1",
+  "KIS.maxPointsPerTask": "1000.0"
  }
 }

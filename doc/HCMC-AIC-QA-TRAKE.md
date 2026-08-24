@@ -1,6 +1,6 @@
 # HCMC AIC 2026: Q&A và TRAKE
 
-Tài liệu này ghi lại phần mở rộng DRES để phục vụ các task HCMC AIC Q&A và TRAKE. Phần mở rộng được thực hiện trên nhánh `dev` và không thay đổi ý nghĩa của các task DRES hiện có.
+Tài liệu này ghi lại phần mở rộng DRES để phục vụ các task HCMC AIC Q&A và TRAKE. Preset Q&A dùng tên `LSC Question & Answer Text` để tương thích với template JSON từ các DRES server khác, nhưng dùng cấu trúc target AIC được mô tả bên dưới.
 
 ## Phạm vi và quy ước thời gian
 
@@ -67,9 +67,9 @@ Các chuỗi không đúng format bị từ chối ở tầng submission, thay v
 
 ## Tạo và import template
 
-Hai preset mới có sẵn tại:
+Hai preset có sẵn tại:
 
-- `backend/src/main/resources/dres-type-presets/70_AIC-Q&A.json`
+- `backend/src/main/resources/dres-type-presets/60_LSC-Q&A-Text.json` — tên task type `LSC Question & Answer Text`, `targetOption: TEXT_VIDEO_SEGMENT`
 - `backend/src/main/resources/dres-type-presets/80_AIC-TRAKE.json`
 
 Frontend template builder hỗ trợ:
@@ -93,7 +93,10 @@ Ví dụ Q&A tối thiểu:
   "submissionOptions": ["NO_DUPLICATES", "LIMIT_CORRECT_PER_TEAM", "TEXTUAL_SUBMISSION"],
   "taskOptions": ["HIDDEN_RESULTS"],
   "scoreOption": "KIS",
-  "configuration": { "LIMIT_CORRECT_PER_TEAM.limit": "1" },
+  "configuration": {
+    "LIMIT_CORRECT_PER_TEAM.limit": "1",
+    "KIS.maxPointsPerTask": "1000.0"
+  },
   "targets": [{
     "type": "TEXT_MEDIA_ITEM_TEMPORAL_RANGE",
     "target": "DOG",
@@ -128,7 +131,7 @@ Ví dụ TRAKE tối thiểu:
 
 ### KIS / Q&A
 
-Q&A dùng `KIS`. Mặc định khi template không cấu hình score:
+Q&A dùng `KIS`. Preset `LSC Question & Answer Text` cấu hình `KIS.maxPointsPerTask = 1000.0`, nên điểm tối đa mặc định khi tạo task bằng preset là **1000**; end point và penalty lần lượt là 500 và 100 nếu không ghi đè riêng. Khi một template không có cấu hình KIS, các mặc định chung của DRES là:
 
 - `maxPointsPerTask = 100`
 - `maxPointsAtTaskEnd = 50`
