@@ -30,9 +30,9 @@ export class CompactTeamsViewerComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Fetch submissions every 2 seconds
+    // Fetch submissions with the evaluation polling cadence.
     const submissions$ = this.state.pipe(
-      sampleTime(2000),
+      sampleTime(1000),
       switchMap((st) =>
         this.evaluationService.getApiV2EvaluationByEvaluationIdSubmissionList(st.evaluationId).pipe(catchError(() => of([])))
       ),

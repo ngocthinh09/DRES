@@ -146,7 +146,7 @@ export class TeamsViewerComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     /* Create source observable; list of all submissions.  */
     this.submissions = this.state.pipe(
-      sampleTime(2000), //only check once every two seconds
+      sampleTime(1000),
       switchMap((st) =>
         this.evaluationService.getApiV2EvaluationByEvaluationIdSubmissionList(st.evaluationId).pipe(
           catchError((err: HttpErrorResponse) => {

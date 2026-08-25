@@ -35,15 +35,6 @@ export class AppConfig {
   }
 
   /**
-   * URL to the DRES WebSocket endpoint.
-   */
-  get webSocketUrl() {
-    const config = this.config;
-    const port = config.endpoint.port === -1 ? '' : `:${config.endpoint.port}`;
-    return `${config.endpoint.tls ? 'wss://' : 'ws://'}${config.endpoint.host}${port}/api/ws/run`;
-  }
-
-  /**
    * Resolves the given path given the global backend URL.
    *
    * That is, it returns the URL of the form http://[host]:[port]/[path]

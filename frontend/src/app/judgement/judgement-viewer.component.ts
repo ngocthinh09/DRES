@@ -1,5 +1,5 @@
 import {AfterViewInit, Component, HostListener, Input, OnDestroy, ViewChild} from '@angular/core';
-import {BehaviorSubject, merge, Observable, of, Subscription, timer} from 'rxjs';
+import {BehaviorSubject, Observable, of, Subscription, timer} from 'rxjs';
 import {ActivatedRoute, Router} from '@angular/router';
 import {catchError, filter, map, switchMap, take, withLatestFrom} from 'rxjs/operators';
 import {JudgementMediaViewerComponent} from './judgement-media-viewer.component';
@@ -10,12 +10,9 @@ import {MatDialog} from '@angular/material/dialog';
 import {JudgementDialogComponent} from './judgement-dialog/judgement-dialog.component';
 import {JudgementDialogContent} from './judgement-dialog/judgement-dialog-content.model';
 import {ApiJudgement, ApiJudgementRequest, ApiVerdictStatus, JudgementService} from '../../../openapi';
-import {WebSocketService} from '../services/websocket.service';
-import {ServerMessageType} from '../model/ws/server-message-type.enum';
 
 /**
- * This component subscribes to the websocket for submissions.
- * If the current task is an AVS task, a new submission triggers judgment.
+ * This component polls for submissions that require judgement.
  */
 @Component({
   selector: 'app-judgement-viewer',
@@ -68,14 +65,11 @@ export class JudgementViewerComponent implements AfterViewInit, OnDestroy {
         private activeRoute: ActivatedRoute,
         private snackBar: MatSnackBar,
         private router: Router,
-        private dialog: MatDialog,
-        private wsService: WebSocketService
+        private dialog: MatDialog
     ) {
     }
 
     ngAfterViewInit(): void {
-        this.activeRoute.params.pipe(map((p) => p.runId), take(1)).subscribe((id) => this.wsService.connect(id));
-
         const dialogRef = this.dialog.open(JudgementDialogComponent, {
             width: '400px',
             data: {
@@ -132,17 +126,9 @@ export class JudgementViewerComponent implements AfterViewInit, OnDestroy {
         /* Subscription and current run id */
         this.runId = this.activeRoute.params.pipe(map((p) => p.runId));
 
-        /* Trigger on relevant WebSocket events, with a 30s fallback poll in case the socket drops. */
-        const wsRefresh$ = this.wsService.messages$.pipe(
-            filter((msg) => [
-                ServerMessageType.ServerMessageTypeEnum.TASK_UPDATED,
-                ServerMessageType.ServerMessageTypeEnum.TASK_START,
-                ServerMessageType.ServerMessageTypeEnum.TASK_END,
-            ].includes(msg.type))
-        );
-        const trigger$ = merge(timer(0, 30_000), wsRefresh$);
+        const trigger$ = timer(0, this.pollingFrequency);
 
-        /* Fetch judge status on websocket event or fallback interval. */
+        /* Fetch judge status on every polling interval. */
         this.statusSub = trigger$
             .pipe(
                 withLatestFrom(this.runId),
@@ -168,7 +154,7 @@ export class JudgementViewerComponent implements AfterViewInit, OnDestroy {
                 this.updateProgress(pending, open);
             });
 
-        /* Fetch next judgement request on websocket event or fallback interval. */
+        /* Fetch the next judgement request on every polling interval. */
         this.requestSub = trigger$
             .pipe(
                 withLatestFrom(this.runId),
@@ -236,7 +222,6 @@ export class JudgementViewerComponent implements AfterViewInit, OnDestroy {
      *
      */
     ngOnDestroy(): void {
-        this.wsService.disconnect();
         this.stopAll();
     }
 

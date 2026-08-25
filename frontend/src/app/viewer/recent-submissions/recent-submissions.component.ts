@@ -39,7 +39,7 @@ export class RecentSubmissionsComponent implements OnInit {
       });
 
     const submissions$ = this.state.pipe(
-      sampleTime(2000),
+      sampleTime(1000),
       switchMap((st) =>
         this.evaluationService.getApiV2EvaluationByEvaluationIdSubmissionList(st.evaluationId).pipe(catchError(() => of([])))
       ),

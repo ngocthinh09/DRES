@@ -1,5 +1,5 @@
 import { Component, Input, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { BehaviorSubject, merge, Observable, of, Subscription, timer } from 'rxjs';
+import { BehaviorSubject, Observable, of, Subscription, timer } from 'rxjs';
 import { catchError, filter, map, switchMap, take, withLatestFrom } from 'rxjs/operators';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppConfig } from '../app.config';
@@ -7,8 +7,6 @@ import { HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { JudgementMediaViewerComponent } from './judgement-media-viewer.component';
 import {ApiJudgementRequest, JudgementService} from '../../../openapi';
-import { WebSocketService } from '../services/websocket.service';
-import { ServerMessageType } from '../model/ws/server-message-type.enum';
 
 @Component({
   selector: 'app-judgement-voting-viewer',
@@ -35,26 +33,15 @@ export class JudgementVotingViewerComponent implements OnInit, OnDestroy {
     private activeRoute: ActivatedRoute,
     private config: AppConfig,
     private snackBar: MatSnackBar,
-    private router: Router,
-    private wsService: WebSocketService
+    private router: Router
   ) {}
 
   ngOnInit(): void {
     this.runId = this.activeRoute.params.pipe(map((p) => p.runId));
     this.voteClientPath = this.runId.pipe(map((id) => this.config.resolveUrl(`vote#${id}`)));
 
-    this.runId.pipe(take(1)).subscribe((id) => this.wsService.connect(id));
-
-    const wsRefresh$ = this.wsService.messages$.pipe(
-      filter((msg) => [
-        ServerMessageType.ServerMessageTypeEnum.TASK_UPDATED,
-        ServerMessageType.ServerMessageTypeEnum.TASK_START,
-        ServerMessageType.ServerMessageTypeEnum.TASK_END,
-      ].includes(msg.type))
-    );
-
-    /* Fetch next vote request on websocket event or 30s fallback poll. */
-    this.requestSub = merge(timer(0, 30_000), wsRefresh$)
+    /* Fetch the next vote request on every polling interval. */
+    this.requestSub = timer(0, this.pollingFrequency)
       .pipe(
         withLatestFrom(this.runId),
         switchMap(([_, runId]) => {
@@ -110,7 +97,6 @@ export class JudgementVotingViewerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.wsService.disconnect();
     this.requestSub.unsubscribe();
     this.requestSub = null;
     if (this.judgePlayer) {

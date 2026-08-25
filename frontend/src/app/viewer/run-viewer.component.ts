@@ -1,6 +1,6 @@
 import {AfterViewInit, Component, Inject, OnDestroy, OnInit, ViewContainerRef, DOCUMENT} from '@angular/core';
 import { ActivatedRoute, ActivationEnd, Params, Router } from "@angular/router";
-import {merge, Observable, of, zip} from 'rxjs';
+import {merge, Observable, of, timer, zip} from 'rxjs';
 import {
   catchError,
   filter,
@@ -11,8 +11,6 @@ import {
   take
 } from "rxjs/operators";
 import { AppConfig } from '../app.config';
-import { WebSocketService } from '../services/websocket.service';
-import { ServerMessageType } from '../model/ws/server-message-type.enum';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Position } from './model/run-viewer-position';
 import { Widget } from './model/run-viewer-widgets';
@@ -94,7 +92,6 @@ export class RunViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     private snackBar: MatSnackBar,
     private titleService: Title,
     private overlay: Overlay,
-    private wsService: WebSocketService,
     @Inject(DOCUMENT) private document: Document,
     private _viewContainerRef: ViewContainerRef
   ) {
@@ -160,42 +157,10 @@ export class RunViewerComponent implements OnInit, AfterViewInit, OnDestroy {
       shareReplay({ bufferSize: 1, refCount: true })
     );
 
-    /* WS messages that carry a state diff directly (TASK_START, TASK_END). */
-    const stateWs$ = this.wsService.messages$.pipe(
-      filter((msg) => [
-        ServerMessageType.ServerMessageTypeEnum.TASK_START,
-        ServerMessageType.ServerMessageTypeEnum.TASK_END,
-      ].includes(msg.type))
-    );
-
-    /* WS messages that signal a state change but carry no payload of their own. */
-    const stateRefreshWs$ = this.wsService.messages$.pipe(
-      filter((msg) => [
-        ServerMessageType.ServerMessageTypeEnum.TASK_PREPARE,
-        ServerMessageType.ServerMessageTypeEnum.TASK_UPDATED,
-        ServerMessageType.ServerMessageTypeEnum.COMPETITION_START,
-        ServerMessageType.ServerMessageTypeEnum.COMPETITION_UPDATE,
-        ServerMessageType.ServerMessageTypeEnum.COMPETITION_END,
-      ].includes(msg.type))
-    );
-
     this.state = this.evaluationId.pipe(
       switchMap((id) =>
-        merge(
-          /* Initial load for this evaluation. */
-          this.runService.getApiV2EvaluationByEvaluationIdState(id),
-          /* Apply diff directly when the WS message carries state — no HTTP needed. */
-          stateWs$.pipe(
-            filter((msg) => msg.state != null),
-            map((msg) => msg.state as ApiEvaluationState)
-          ),
-          /* Fallback HTTP fetch for state-carrying messages without a payload, for
-             messages that signal a state change without carrying one, and after a
-             WebSocket reconnect — any event missed while disconnected needs a full resync. */
-          merge(stateWs$.pipe(filter((msg) => msg.state == null)), stateRefreshWs$, this.wsService.reconnected$).pipe(
-            switchMap(() => this.runService.getApiV2EvaluationByEvaluationIdState(id))
-          )
-        )
+        /* State is the authoritative source for task transitions and clock updates. */
+        timer(0, 1_000).pipe(switchMap(() => this.runService.getApiV2EvaluationByEvaluationIdState(id)))
       ),
       catchError((err, o) => {
         console.log(
@@ -242,23 +207,17 @@ export class RunViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  /**
-   * Registers this RunViewerComponent on view initialization and creates the WebSocket subscription.
-   */
-  ngOnInit(): void {
-    this.evaluationId.pipe(take(1)).subscribe((id) => this.wsService.connect(id));
-  }
+  ngOnInit(): void {}
 
   /**
-   * Prepare the overlay that is being displayed when WebSocket connection times out.
+   * Prepare the overlay that is being displayed when the view is initialized.
    */
   ngAfterViewInit() {}
 
   /**
-   * Unregisters this RunViewerComponent on view destruction and cleans the WebSocket subscription.
+   * Cleans up the viewer title on destruction.
    */
   ngOnDestroy(): void {
-    this.wsService.disconnect();
     this.titleService.setTitle('DRES');
   }
 
