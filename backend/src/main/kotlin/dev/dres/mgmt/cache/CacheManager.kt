@@ -394,7 +394,7 @@ class CacheManager(private val config: Config, private val store: TransientEntit
                 .addArguments("-b:v", "2000k")
                 .addArguments("-filter:v", "scale=${this@CacheManager.config.cache.previewVideoMaxSize}:-1")
                 .addArguments("-tune", "zerolatency")
-                .addArguments("-preset", "slow")
+                .addArguments("-preset", "veryfast")
                 .setOutputListener { l -> LOGGER.debug(MARKER, l); }
                 .execute()
 

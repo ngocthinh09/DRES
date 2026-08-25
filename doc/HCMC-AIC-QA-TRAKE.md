@@ -174,6 +174,10 @@ Tệp backend chính:
 - `backend/src/main/kotlin/dev/dres/data/model/run/AbstractInteractiveTask.kt`
 - `backend/src/main/kotlin/dev/dres/mgmt/TemplateManager.kt`
 
+Preview video được render bằng FFmpeg/x264 với preset `veryfast` để giảm thời gian
+chuẩn bị evaluation. Việc này chỉ ảnh hưởng preview cache, không thay đổi video gốc,
+target range hoặc cách chấm điểm.
+
 ## Kiểm thử đã thêm
 
 - `AicTextSubmissionTransformerTest`: Q&A có answer chứa dấu `-`, TRAKE đổi Frame ID sang ms, metadata video không hợp lệ, và format sai.
