@@ -332,6 +332,66 @@ còn literal `slow` trong source hiện tại và bytecode `backend.jar` cũng c
 thể làm CPU gần 100%. `veryfast` thường hoàn thành nhanh hơn nhưng không đảm bảo CPU
 thấp hơn tại mọi thời điểm.
 
+#### Benchmark FFmpeg trên máy development (2026-08-25)
+
+Máy benchmark là Intel Xeon Platinum 8259CL, 2 core vật lý/4 vCPU, có AVX2/AVX-512,
+không có GPU encoder. Input chính là `videos/L22_V004.mp4` (H.264, 1280×720, 30 fps);
+command chuẩn hóa dùng `-ss 00:10:00`, **`-t 30`**, `libx264`, AAC, 2000k, scale 480p,
+`zerolatency`, `veryfast`. Output luôn là 30 giây.
+
+| FFmpeg | Single render, wall time trung bình | Hai render song song, wall time | Nhận xét |
+| --- | ---: | ---: | --- |
+| DRES 4.4.1 static | 4.18 s | **6.74 s** | Thắng throughput với 2 renderer trên 4 vCPU. |
+| 7.0.2 static | 4.16 s | không ưu tiên đo tiếp | Gần như không cải thiện single render. |
+| 8.1.2 GPL build | 3.69 s | 7.04 s | Nhanh hơn ~12% khi chỉ một render, nhưng dùng CPU/RAM cao hơn. |
+| 9.0.1 GPL build | 3.68 s | 6.97 s | Tương tự 8.1; không thắng 4.4.1 khi hai render tranh 4 vCPU. |
+
+Một input độc lập `videos/L21_V009.mp4` cho cùng xu hướng single render: 4.4.1 là
+3.64 s, 8.1.2 là 3.23 s, 9.0.1 là 3.22 s. Bản 8/9 tạo file chỉ chênh dưới 0.4% dung
+lượng so với 4.4.1, nhưng hash output khác vì encoder/library khác.
+
+Kết luận vận hành hiện tại: không nên chỉ nâng FFmpeg để mong tạo evaluation nhanh
+hơn. Với `maxRenderingThreads=2` trên máy 4 vCPU, 4.4.1 hiện cho aggregate throughput
+tốt hơn. FFmpeg 8.1/9.0 chỉ đáng dùng khi giảm renderer xuống một, tăng số vCPU, hoặc
+benchmark lại trên máy production. Các binary 8.1/9.0 benchmark là GPL static build;
+không được thay binary production mà không regression-test decode, output và cache.
+
+#### Lỗi nghiêm trọng trong lệnh cắt preview đã được sửa trước khi đổi FFmpeg
+
+`PreviewVideoFromVideoRequest` từng seek bằng `-ss <start>` nhưng sau đó truyền
+`-to <end-timecode>` tuyệt đối. Trong FFmpeg, trường hợp này không biểu diễn duration
+`end - start`; điều này giải thích các preview có start time lớn (ví dụ 18 phút) tiêu
+tốn CPU và thời gian bất thường.
+
+Benchmark chi tiết ngày 2026-08-25 giữ nguyên codec/settings của DRES (`libx264`, AAC,
+2000k, scale 480p, `veryfast`) và dùng `-ss` trước input, sau đó so sánh output option:
+
+| Video | Range yêu cầu | `-t end-start` | `-to end` cũ | Chênh CPU-time |
+| --- | --- | ---: | ---: | ---: |
+| `L22_V004` (720p/30) | 10:00–10:30 | 30 s output; 6.92 s wall; 10.40 s CPU | 630 s output; 100.57 s wall; 207.11 s CPU | 19.9× |
+| `L22_V025` (720p/30) | 05:00–05:30 | 30 s output; 4.01 s wall; 8.21 s CPU | 330 s output; 46.90 s wall; 104.76 s CPU | 12.8× |
+| `L21_V009` (720p/25) | 05:00–05:30 | 30 s output; 4.44 s wall; 10.92 s CPU | 330 s output; 44.51 s wall; 102.46 s CPU | 9.4× |
+
+Vì `-t` giới hạn duration, preview ngắn vẫn có thể dùng hết core trong lúc x264 encode,
+nhưng sẽ hoàn tất sớm hơn rất nhiều. Khi hai renderer chạy song song, x264 có thể bão
+hòa toàn bộ 4 vCPU; thay đổi này giảm tổng CPU-time chứ không nhằm giảm đỉnh CPU.
+
+Đã giữ `-ss <start>` và thay:
+
+```kotlin
+.addArguments("-to", endTimecode)
+```
+
+bằng duration:
+
+```kotlin
+.addArguments("-t", millisecondToTimestamp(this.end - this.start))
+```
+
+Các key cache đã bao gồm `start-end`, nên cache cũ có cùng key có thể chứa preview quá
+dài; xóa cache preview cũ trước khi xác minh trên deployment. Đây có tác động lớn hơn
+nhiều so với đổi phiên bản FFmpeg.
+
 ### `3a7be0ac` – cấu hình deployment local và cache
 
 `config.json` hiện tại:
