@@ -392,6 +392,22 @@ Các key cache đã bao gồm `start-end`, nên cache cũ có cùng key có th�
 dài; xóa cache preview cũ trước khi xác minh trên deployment. Đây có tác động lớn hơn
 nhiều so với đổi phiên bản FFmpeg.
 
+#### Tối ưu input seek bằng Jaffree (2026-08-26)
+
+Log runtime cho thấy việc gọi `.addArguments("-ss", startTimecode)` không giữ được vị
+trí input option: Jaffree đã sinh command dạng `-i input -ss start -t duration`. Vì
+vậy FFmpeg phải decode từ đầu video đến timestamp cần lấy; một đoạn 400 ms ở phút
+19:40 mất khoảng 124 giây.
+
+Đã sửa `PreviewVideoFromVideoRequest` dùng API input-specific:
+
+```kotlin
+.addInput(UrlInput.fromPath(this.input).setPosition(this.start, TimeUnit.MILLISECONDS))
+```
+
+Jaffree hiện sinh đúng `-ss 1180.850 -i input ... -t 0:00:00.400`. Test trực tiếp qua
+Jaffree tạo cùng preview 400 ms trong khoảng 0.22 giây, giảm gần 560 lần so với log cũ.
+
 ### `3a7be0ac` – cấu hình deployment local và cache
 
 `config.json` hiện tại:
