@@ -1,10 +1,10 @@
 {
     "httpPort": 8080,
     "enableSsl": false,
-    "dataPath": "/home/thinhvln/storage/dres-data",
-    "externalMediaLocation": "/home/thinhvln/storage/external",
+    "dataPath": "./data",
+    "externalMediaLocation": "./external",
     "cache": {
-      "cachePath": "/home/thinhvln/storage/dres-cache",
+      "cachePath": "./cache",
       "maxRenderingThreads": 2,
       "previewVideoMaxSize": 480
     }
